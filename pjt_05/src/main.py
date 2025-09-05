@@ -8,11 +8,11 @@ def main(page: ft.Page):
         content=ft.Text("Meu Container", size=20, weight="bold", theme_style= ft.TextThemeStyle.HEADLINE_MEDIUM),
         padding=20,
         margin = 30, 
-        bgcolor=ft.Colors.AMBER_100, 
+        bgcolor=ft.Colors.GREY_100, 
         width=300, height=100, 
         alignment=ft.alignment.center, 
         border_radius=30,
-        border=ft.border.all(3, ft.Colors.AMBER_700),
+        border=ft.border.all(3, ft.Colors.BLACK),
 
     )
     page.add(conteiner)
