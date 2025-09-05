@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Salve o Rio - Twine/Harlowe</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8ff;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-left: 5px solid #2a9d8f;
+        }
+        h1 {
+            color: #264653;
+            text-align: center;
+            border-bottom: 2px solid #2a9d8f;
+            padding-bottom: 10px;
+        }
+        .location {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2a9d8f;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .option {
+            padding: 12px 15px;
+            background-color: #2a9d8f;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .option:hover {
+            background-color: #1d7a6e;
+        }
+        .inventory {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed #2a9d8f;
+            margin: 15px 0;
+        }
+        .item {
+            display: inline-block;
+            background-color: #e8f4f8;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 15px;
+            border: 1px solid #2a9d8f;
+        }
+        .evidence {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #ffe8a1;
+            border-radius: 5px;
+            border-left: 4px solid #e9c46a;
+        }
+        .success {
+            color: #2a9d8f;
+            font-weight: bold;
+        }
+        .warning {
+            color: #e76f51;
+            font-weight: bold;
+        }
+        .final {
+            text-align: center;
+            padding: 20px;
+            background-color: #e8f4f8;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .good {
+            color: #2a9d8f;
+        }
+        .bad {
+            color: #e76f51;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Salve o Rio</h1>
+        
+        <div id="game-content">
+            <!-- O conteúdo do jogo será carregado aqui via JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // Variáveis do jogo
+        let gameState = {
+            inventory: [],
+            location: "centro",
+            investigouFabrica: false,
+            investigouLixao: false,
+            investigouEsgoto: false,
+            amostrasColetadas: 0,
+            evidencias: 0,
+            temCracha: false
+        };
+
+        // Salvar estado do jogo no localStorage
+        function saveGame() {
+            localStorage.setItem('salveORioSave', JSON.stringify(gameState));
+        }
+
+        // Carregar estado do jogo do localStorage
+        function loadGame() {
+            const savedGame = localStorage.getItem('salveORioSave');
+            if (savedGame) {
+                gameState = JSON.parse(savedGame);
+            }
+        }
+
+        // Iniciar o jogo
+        function startGame() {
+            loadGame();
+            showLocation(gameState.location);
+        }
+
+        // Mostrar localização atual
+        function showLocation(locationId) {
+            gameState.location = locationId;
+            saveGame();
+            
+            const contentDiv = document.getElementById('game-content');
+            contentDiv.innerHTML = '';
+            
+            switch(locationId) {
+                case 'centro':
+                    showCentro();
+                    break;
+                case 'fabrica':
+                    showFabrica();
+                    break;
+                case 'lixao':
+                    showLixao();
+                    break;
+                case 'esgoto':
+                    showEsgoto();
+                    break;
+                case 'inventario':
+                    showInventario();
+                    break;
+                case 'final':
+                    showFinal();
+                    break;
+                default:
+                    showCentro();
+            }
+        }
+
+        // Adicionar item ao inventário
+        function addItem(item) {
+            if (!gameState.inventory.includes(item)) {
+                gameState.inventory.push(item);
+                saveGame();
+                return true;
+            }
+            return false;
+        }
+
+        // Verificar se tem um item
+        function hasItem(item) {
+            return gameState.inventory.includes(item);
+        }
+
+        // Mostrar tela do centro
+        function showCentro() {
+            const contentDiv = document.getElementById('game-content');
+            
+            let html = `
+                <div class="location">
+                    <h2>Margem do Rio</h2>
+                    <p>Você está na margem do Rio Esperança, que outrora foi cristalino e cheio de vida, mas agora está poluído e moribundo. A comunidade local está preocupada e você se voluntariou para investigar as fontes de poluição.</p>
+                    <p>O que você deseja fazer?</p>
+                </div>
+                
+                <div class="evidence">
+                    <strong>Evidências coletadas:</strong> ${gameState.evidencias}/6<br>
+                    <strong>Amostras coletadas:</strong> ${gameState.amostrasColetadas}/3
+                </div>
+                
+                <div class="options">
+                    <a href="#" class="option" onclick="showLocation('fabrica')">🔍 Investigar a Fábrica Química</a>
+                    <a href="#" class="option" onclick="showLocation('lixao')">🗑️ Investigar o Lixão</a>
+                    <a href="#" class="option" onclick="showLocation('esgoto')">💧 Investigar o Sistema de Esgoto</a>
+                    <a href="#" class="option" onclick="showLocation('inventario')">🎒 Verificar seu inventário</a>
+            `;
+            
+            if (gameState.amostrasColetadas >= 3 && gameState.evidencias >= 5) {
+                html += `<a href="#" class="option" onclick="showLocation('final')" style="background-color: #e76f51;">🚀 Confrontar os responsáveis</a>`;
+            }
+            
+            html += `</div>`;
+            
+            contentDiv.innerHTML = html;
+        }
+
+        // Mostrar tela da fábrica
+        function showFabrica() {
+            if (!gameState.investigouFabrica) {
+                gameState.investigouFabrica = true;
+                gameState.evidencias += 1;
+                saveGame();
+            }
+            
+            const contentDiv = document.getElementById('game-content');
+            
+            let html = `
+                <div class="location">
+                    <h2>Fábrica Química</h2>
+                    <p>Você chega à fábrica química "QuimicaPoluente Ltda". O cheiro de produtos químicos é forte no ar. Você nota que há um cano saindo da fábrica e despejando líquido diretamente no rio.</p>
+                    <p>O que você faz?</p>
+                </div>
+                
+                <div class="options">
+                    <a href="#" class="option" onclick="coletarAmostraFabrica()">🧪 Coletar amostra da água perto do cano</a>
+                    <a href="#" class="option" onclick="entrarFabrica()">🏭 Tentar entrar na fábrica para investigar</a>
+                    <a href="#" class="option" onclick="showLocation('centro')">⬅️ Voltar para o rio</a>
+                </div>
+            `;
+            
+            contentDiv.innerHTML = html;
+        }
+
+        // Coletar amostra na fábrica
+        function coletarAmostraFabrica() {
+            if (addItem("Amostra da Fábrica")) {
+                gameState.amostrasColetadas += 1;
+                saveGame();
+                alert("Você coletou uma amostra da água perto do cano de despejo. Está com uma coloração estranha e cheiro forte.");
+            } else {
+                alert("Você já coletou uma amostra aqui.");
+            }
+            showLocation('fabrica');
+        }
+
+        // Tentar entrar na fábrica
+        function entrarFabrica() {
+            if (gameState.temCracha) {
+                gameState.evidencias += 2;
+                saveGame();
+                alert("Você usa o crachá que encontrou no lixão para entrar na fábrica sem ser notado. Dentro, encontra documentos que comprovam o despejo irregular de resíduos tóxicos.");
+                showLocation('centro');
+            } else {
+                alert('Um segurança impede sua entrada. "Área restrita!", ele diz. Você precisará de uma identificação para entrar.');
+                showLocation('fabrica');
+            }
+        }
+
+        // Mostrar tela do lixão
+        function showLixao() {
+            if (!gameState.investigouLixao) {
+                gameState.investigouLixao = true;
+                gameState.evidencias += 1;
+                saveGame();
+            }
+            
+            const contentDiv = document.getElementById('game-content');
+            
+            let html = `
+                <div class="location">
+                    <h2>Lixão Municipal</h2>
+                    <p>Você chega ao lixão municipal. O local é imenso e mal administrado. Você nota que parte do lixo está sendo arrastado pela chuva em direção ao rio.</p>
+                    <p>O que você faz?</p>
+                </div>
+                
+                <div class="options">
+                    <a href="#" class="option" onclick="investigarMargemLixao()">🔎 Investigar a margem do rio perto do lixão</a>
+                    <a href="#" class="option" onclick="procurarDocumentosLixao()">📄 Procurar por documentos ou pistas</a>
+                    <a href="#" class="option" onclick="showLocation('centro')">⬅️ Voltar para o rio</a>
+                </div>
+            `;
+            
+            contentDiv.innerHTML = html;
+        }
+
+        // Investigar margem do lixão
+        function investigarMargemLixao() {
+            if (addItem("Amostra do Lixão")) {
+                gameState.amostrasColetadas += 1;
+                saveGame();
+                alert("Você encontra resíduos sólidos e líquidos escorrendo do lixão diretamente para o rio. Coleta uma amostra como evidência.");
+            } else {
+                alert("Você já coletou uma amostra aqui.");
+            }
+            showLocation('lixao');
+        }
+
+        // Procurar documentos no lixão
+        function procurarDocumentosLixao() {
+            if (!gameState.temCracha) {
+                addItem("Crachá de Identificação");
+                gameState.temCracha = true;
+                saveGame();
+                alert("Enquanto vasculha a área, você encontra um crachá de identificação da fábrica química. Isso pode ser útil!");
+            } else {
+                alert("Você não encontra nada de novo.");
+            }
+            showLocation('lixao');
+        }
+
+        // Mostrar tela do esgoto
+        function showEsgoto() {
+            if (!gameState.investigouEsgoto) {
+                gameState.investigouEsgoto = true;
+                gameState.evidencias += 1;
+                saveGame();
+            }
+            
+            const contentDiv = document.getElementById('game-content');
+            
+            let html = `
+                <div class="location">
+                    <h2>Estação de Esgoto</h2>
+                    <p>Você chega à estação de tratamento de esgoto. Parece negligenciada e mal conservada. Há sinais de que o esgoto não tratado está vazando para o rio.</p>
+                    <p>O que você faz?</p>
+                </div>
+                
+                <div class="options">
+                    <a href="#" class="option" onclick="coletarAmostraEsgoto()">🧪 Coletar amostra do esgoto</a>
+                    <a href="#" class="option" onclick="inspecionarTubulacoes()">🔧 Inspecionar as tubulações</a>
+                    <a href="#" class="option" onclick="showLocation('centro')">⬅️ Voltar para o rio</a>
+                </div>
+            `;
+            
+            contentDiv.innerHTML = html;
+        }
+
+        // Coletar amostra no esgoto
+        function coletarAmostraEsgoto() {
+            if (addItem("Amostra de Esgoto")) {
+                gameState.amostrasColetadas += 1;
+                saveGame();
+                alert("Você coleta uma amostra da água que está vazando da estação de tratamento. Claramente, o esgoto não está sendo tratado adequadamente.");
+            } else {
+                alert("Você já coletou uma amostra aqui.");
+            }
+            showLocation('esgoto');
+        }
+
+        // Inspecionar tubulações
+        function inspecionarTubulacoes() {
+            gameState.evidencias += 1;
+            saveGame();
+            alert("Você encontra uma tubulação rompida que está despejando esgoto diretamente no rio. Tira fotos como evidência.");
+            showLocation('esgoto');
+        }
+
+        // Mostrar inventário
+        function showInventario() {
+            const contentDiv = document.getElementById('game-content');
+            
+            let html = `
+                <div class="location">
+                    <h2>Seu Inventário</h2>
+                    <div class="inventory">
+            `;
+            
+            if (gameState.inventory.length === 0) {
+                html += `<p>Seu inventário está vazio.</p>`;
+            } else {
+                html += `<p>Itens no seu inventário:</p>`;
+                gameState.inventory.forEach(item => {
+                    html += `<div class="item">${item}</div>`;
+                });
+            }
+            
+            html += `
+                    </div>
+                </div>
+                
+                <div class="options">
+                    <a href="#" class="option" onclick="showLocation('centro')">⬅️ Voltar para o rio</a>
+                </div>
+            `;
+            
+            contentDiv.innerHTML = html;
+        }
+
+        // Mostrar final do jogo
+        function showFinal() {
+            const contentDiv = document.getElementById('game-content');
+            
+            let resultado = "";
+            if (gameState.evidencias >= 6) {
+                resultado = `
+                    <h2 class="good">Final Ótimo!</h2>
+                    <p>Sua investigação foi completa! A fábrica foi multada e obrigada a instalar sistemas de tratamento, o lixão foi saneado e a estação de esgoto foi reformada. O rio começa a se recuperar!</p>
+                `;
+            } else if (gameState.evidencias >= 4) {
+                resultado = `
+                    <h2 class="good">Final Bom</h2>
+                    <p>Sua investigação foi boa. A fábrica foi multada, mas outras fontes de poluição continuam. O rio melhora, mas não completamente.</p>
+                `;
+            } else {
+                resultado = `
+                    <h2 class="bad">Final Regular</h2>
+                    <p>Sua investigação foi limitada. Apenas algumas medidas são tomadas, e o rio continua ameaçado.</p>
+                `;
+            }
+            
+            let html = `
+                <div class="final">
+                    <h2>Resultado da Investigação</h2>
+                    <p>Com todas as evidências coletadas, você:</p>
+                    <ul>
+                        <li>Entrega as amostras para um laboratório independente</li>
+                        <li>Envia as fotos e documentos para a imprensa</li>
+                        <li>Organiza a comunidade para protestar</li>
+                    </ul>
+                    
+                    ${resultado}
+                    
+                    <div class="options">
+                        <a href="#" class="option" onclick="resetGame()">🔄 Jogar Novamente</a>
+                    </div>
+                </div>
+            `;
+            
+            contentDiv.innerHTML = html;
+        }
+
+        // Reiniciar o jogo
+        function resetGame() {
+            gameState = {
+                inventory: [],
+                location: "centro",
+                investigouFabrica: false,
+                investigouLixao: false,
+                investigouEsgoto: false,
+                amostrasColetadas: 0,
+                evidencias: 0,
+                temCracha: false
+            };
+            localStorage.removeItem('salveORioSave');
+            startGame();
+        }
+
+        // Iniciar o jogo quando a página carregar
+        window.onload = startGame;
+    </script>
+</body>
+</html>
