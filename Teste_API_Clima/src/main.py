@@ -1,15 +1,13 @@
-# main.py
 import flet as ft
 import asyncio
 from datetime import datetime
 from teste_api import busca_clima
-from db import criar_tabela, salvar_clima, listar_climas
+from db import criar_tabelas, salvar_clima, listar_climas, salvar_cidade, remover_cidade, listar_cidades
 
-# intervalo de atualização automática (em segundos)
-UPDATE_INTERVAL = 300  # 5 minutos (mude se quiser)
+UPDATE_INTERVAL = 300  # segundos (5 min)
 
 async def main(page: ft.Page):
-    criar_tabela()
+    criar_tabelas()
 
     page.title = "Consulta Clima"
     page.scroll = "adaptive"
@@ -27,24 +25,29 @@ async def main(page: ft.Page):
     mensagem = ft.Text("Aguardando consulta...", size=14, color=ft.Colors.RED_600)
     loader = ft.ProgressRing(visible=False)
 
-    cidade_input = ft.TextField(label="Digite o nome da cidade", expand=True, autofocus = True, on_submit = lambda e: adicionar_cidade(e))
-    cidades: list[str] = []                      # lista de nomes de cidade
+    cidade_input = ft.TextField(label="Digite o nome da cidade", expand=True, autofocus = True, on_submit=lambda e: adicionar_cidade(e))
+
+    # cidades monitoradas ficam no banco
+    cidades: list[str] = listar_cidades()
     cidades_column = ft.Column()
+    resultado_cards: dict[str, ft.Card] = {}  # cidade -> card
+
     resultado_coluna = ft.Column(spacing=10)
 
-    # --- helpers UI ---
+    # ---------------- FUNÇÕES ----------------
     def rebuild_cidades():
         cidades_column.controls.clear()
         for nome in cidades:
             def remover(e, nome=nome):
-                try:
+                if nome in cidades:
                     cidades.remove(nome)
-                except ValueError:
-                    pass
-                rebuild_cidades()
-                page.update()
+                    remover_cidade(nome)
+                    rebuild_cidades()
+                    if nome in resultado_cards:
+                        resultado_coluna.controls.remove(resultado_cards[nome])
+                        del resultado_cards[nome]
+                    page.update()
 
-            # botão atualizar uma cidade (dispara task segura)
             def atual_one(e, nome=nome):
                 page.run_task(atualizar_cidade, nome)
 
@@ -75,143 +78,79 @@ async def main(page: ft.Page):
             mensagem.color = ft.Colors.ORANGE_700
             page.update()
             return
+
         cidades.append(nome)
+        salvar_cidade(nome)
         cidade_input.value = ""
         rebuild_cidades()
         page.update()
 
-    # atualiza uma única cidade (executa I/O em thread seguro)
     async def atualizar_cidade(nome: str):
         loader.visible = True
         page.update()
-        try:
-            clima_info = await asyncio.to_thread(busca_clima, nome)
-        except Exception as ex:
-            clima_info = None
-            print("Erro na requisição:", ex)
+        clima_info = await asyncio.to_thread(busca_clima, nome)
 
         if clima_info:
-            # salva no DB (rodando em thread para não bloquear)
-            try:
-                await asyncio.to_thread(
-                    salvar_clima,
-                    clima_info["cidade"],
-                    clima_info["descricao"],
-                    clima_info["temperatura"],
-                    clima_info["umidade"],
-                )
-            except Exception as ex:
-                print("Erro ao salvar no DB:", ex)
+            await asyncio.to_thread(
+                salvar_clima,
+                clima_info["cidade"],
+                clima_info["descricao"],
+                clima_info["temperatura"],
+                clima_info["umidade"],
+            )
 
-            card = ft.Card(
+            novo_card = ft.Card(
                 content=ft.Container(
                     content=ft.Column(
                         [
                             ft.Row([ft.Icon(ft.Icons.LOCATION_CITY, color=ft.Colors.BLUE), ft.Text(clima_info["cidade"], weight="bold")]),
                             ft.Row([ft.Icon(ft.Icons.WB_CLOUDY), ft.Text(clima_info["descricao"].capitalize())]),
                             ft.Row([ft.Icon(ft.Icons.THERMOSTAT, color=ft.Colors.RED), ft.Text(f"{clima_info['temperatura']}°C")]),
-                            ft.Row([ft.Icon(ft.Icons.WATER_DROP), ft.Text(f"{clima_info['umidade']}%")]),
+                            ft.Row([ft.Icon(ft.Icons.WATER_DROP, color=ft.Colors.BLUE), ft.Text(f"{clima_info['umidade']}%")]),
                         ],
                         spacing=6,
                     ),
                     padding=10,
-                ),
-            )
-            # insere no topo dos resultados
-            resultado_coluna.controls.insert(0, card)
-        else:
-            resultado_coluna.controls.insert(0, ft.Text(f"{nome}: erro ao consultar"))
-
-        loader.visible = False
-        mensagem.value = f"Última atualização: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        mensagem.color = ft.Colors.GREEN_600
-        page.update()
-
-    # atualiza todas as cidades (usado por botão e por loop periódico)
-    async def atualizar_todas_cidades():
-        if not cidades:
-            mensagem.value = "Nenhuma cidade para atualizar."
-            mensagem.color = ft.Colors.RED_600
-            page.update()
-            return
-
-        loader.visible = True
-        mensagem.value = "Atualizando todas as cidades..."
-        resultado_coluna.controls.clear()
-        page.update()
-
-        for nome in list(cidades):
-            try:
-                clima_info = await asyncio.to_thread(busca_clima, nome)
-            except Exception as ex:
-                clima_info = None
-                print("Erro na requisição:", ex)
-
-            if clima_info:
-                # salva no DB sem bloquear
-                try:
-                    await asyncio.to_thread(
-                        salvar_clima,
-                        clima_info["cidade"],
-                        clima_info["descricao"],
-                        clima_info["temperatura"],
-                        clima_info["umidade"],
-                    )
-                except Exception as ex:
-                    print("Erro ao salvar no DB:", ex)
-
-                card = ft.Card(
-                    content=ft.Container(
-                        content=ft.Column(
-                            [
-                                ft.Row([ft.Icon(ft.Icons.LOCATION_CITY, color=ft.Colors.BLUE), ft.Text(clima_info["cidade"], weight="bold")]),
-                                ft.Row([ft.Icon(ft.Icons.WB_CLOUDY), ft.Text(clima_info["descricao"].capitalize())]),
-                                ft.Row([ft.Icon(ft.Icons.THERMOSTAT, color=ft.Colors.RED), ft.Text(f"{clima_info['temperatura']}°C")]),
-                                ft.Row([ft.Icon(ft.Icons.WATER_DROP), ft.Text(f"{clima_info['umidade']}%")]),
-                            ],
-                            spacing=6,
-                        ),
-                        padding=10,
-                    ),
                 )
-                resultado_coluna.controls.append(card)
-            else:
-                resultado_coluna.controls.append(ft.Text(f"{nome}: erro ao consultar"))
+            )
 
-            # atualiza UI após cada cidade (mais responsivo)
-            page.update()
+            # substitui card antigo se já existir
+            if nome in resultado_cards:
+                idx = resultado_coluna.controls.index(resultado_cards[nome])
+                resultado_coluna.controls[idx] = novo_card
+            else:
+                resultado_coluna.controls.append(novo_card)
+
+            resultado_cards[nome] = novo_card
+
+        else:
+            mensagem.value = f"Erro ao consultar {nome}"
+            mensagem.color = ft.Colors.RED_600
 
         loader.visible = False
         mensagem.value = f"Última atualização: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         mensagem.color = ft.Colors.GREEN_600
         page.update()
 
-    # loop periódico (executado em background pelo page.run_task)
+    async def atualizar_todas_cidades():
+        for nome in cidades:
+            await atualizar_cidade(nome)
+
     async def periodic():
         while True:
-            await atualizar_todas_cidades()
+            if cidades:
+                await atualizar_todas_cidades()
             await asyncio.sleep(UPDATE_INTERVAL)
 
-    # mostra histórico do DB em um diálogo
     def mostrar_historico(e):
         async def _show():
-            rows = await asyncio.to_thread(listar_climas)  # lista do DB
+            rows = await asyncio.to_thread(listar_climas)
             content_column = ft.Column(spacing=6)
             content_column.controls.append(ft.Text("Histórico (mais recente primeiro):", weight="bold"))
-            # limita para não lotar a UI
-            for r in rows[:100]:
+            for r in rows[:50]:
                 cidade, descricao, temperatura, umidade, data_hora = r
                 content_column.controls.append(
-                    ft.Row(
-                        [
-                            ft.Text(data_hora, size=12),
-                            ft.Text(cidade, weight="bold"),
-                            ft.Text(f"{temperatura}°C"),
-                            ft.Text(f"{umidade}%"),
-                            ft.Text(descricao),
-                        ],
-                        spacing=10,
-                    )
+                    ft.Row([ft.Text(data_hora, size=12), ft.Text(cidade), ft.Text(f"{temperatura}°C"), ft.Text(f"{umidade}%"), ft.Text(descricao)])
                 )
 
             def fechar(evt):
@@ -229,7 +168,7 @@ async def main(page: ft.Page):
 
         page.run_task(_show)
 
-    # --- botões / layout ---
+    # ---------------- LAYOUT ----------------
     botao_add = ft.IconButton(icon=ft.Icons.ADD, tooltip="Adicionar cidade", on_click=adicionar_cidade)
     botao_atualizar = ft.ElevatedButton("Atualizar agora", on_click=lambda e: page.run_task(atualizar_todas_cidades))
     botao_historico = ft.ElevatedButton("Histórico", on_click=mostrar_historico)
@@ -254,7 +193,6 @@ async def main(page: ft.Page):
         )
     )
 
-    # inicia o loop periódico em background (sem bloquear a UI)
     page.run_task(periodic)
 
 

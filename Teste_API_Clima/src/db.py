@@ -4,9 +4,11 @@ from datetime import datetime
 
 DB_FILE = "clima.db"
 
-def criar_tabela():
+def criar_tabelas():
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
+
+    # tabela de histórico
     cur.execute("""
         CREATE TABLE IF NOT EXISTS clima (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,9 +19,20 @@ def criar_tabela():
             data_hora TEXT
         )
     """)
+
+    # tabela de cidades monitoradas
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cidades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT UNIQUE
+        )
+    """)
+
     conn.commit()
     conn.close()
 
+
+# -------- Histórico --------
 def salvar_clima(cidade, descricao, temperatura, umidade):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
@@ -38,5 +51,29 @@ def listar_climas(limit: int | None = None):
         sql += f" LIMIT {int(limit)}"
     cur.execute(sql)
     rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+# -------- Cidades monitoradas --------
+def salvar_cidade(nome: str):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO cidades (nome) VALUES (?)", (nome,))
+    conn.commit()
+    conn.close()
+
+def remover_cidade(nome: str):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cidades WHERE nome=?", (nome,))
+    conn.commit()
+    conn.close()
+
+def listar_cidades():
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("SELECT nome FROM cidades")
+    rows = [r[0] for r in cur.fetchall()]
     conn.close()
     return rows
